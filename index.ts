@@ -1,37 +1,33 @@
-import { KiteConnect } from "kiteconnect";
+import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
 
-const apiKey = "your_api_key";
-const apiSecret = "your_api_secret";
-const requestToken = "your_request_token"; //token for other to place trades to others accout if it becomes popular //
+// Create an MCP server
+const server = new McpServer({
+  name: "Demo",
+  version: "1.0.0"
+});
 
-const kc = new KiteConnect({ api_key: apiKey });
+// Add an addition tool
+server.tool("add",
+  { a: z.number(), b: z.number() },
+  async ({ a, b }) => ({
+    content: [{ type: "text", text: String(a + b) }]
+  })
+);
 
-async function init() {
-  try { 
-    await generateSession();
-    await getProfile();
-  } catch (err) {
-    console.error(err);
-  }
-}
+// Add a dynamic greeting resource
+server.resource(
+  "greeting",
+  new ResourceTemplate("greeting://{name}", { list: undefined }),
+  async (uri, { name }) => ({
+    contents: [{
+      uri: uri.href,
+      text: `Hello, ${name}!`
+    }]
+  })
+);
 
-async function generateSession() {
-  try {
-    const response = await kc.generateSession(requestToken, apiSecret);
-    kc.setAccessToken(response.access_token);
-    console.log("Session generated:", response);
-  } catch (err) {
-    console.error("Error generating session:", err);
-  }
-}
-
-async function getProfile() {
-  try {
-    const profile = await kc.getProfile();
-    console.log("Profile:", profile);
-  } catch (err) {
-    console.error("Error getting profile:", err);
-  }
-}
-// Initialize the API calls
-init();
+// Start receiving messages on stdin and sending messages on stdout
+const transport = new StdioServerTransport();
+await server.connect(transport);
